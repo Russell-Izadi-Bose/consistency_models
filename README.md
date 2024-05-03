@@ -91,3 +91,8 @@ If you find this method and/or code useful, please consider citing
   year={2023},
 }
 ```
+
+# Sample
+```
+./consistency_models/scripts/sample.sh
+```

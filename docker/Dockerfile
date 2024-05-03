@@ -15,5 +15,5 @@ RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel packaging mpi4py 
     && pip3 install flash-attn==0.2.8
 
 WORKDIR /home/
-RUN pip3 install -e git+https://github.com/openai/consistency_models.git@main#egg=consistency_models \
-    && ln -s /usr/bin/python3 /usr/bin/python
+# RUN pip3 install -e git+https://github.com/openai/consistency_models.git@main#egg=consistency_models \
+#     && ln -s /usr/bin/python3 /usr/bin/python

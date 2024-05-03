@@ -4,29 +4,35 @@ numpy array. This can be used to produce samples for FID evaluation.
 """
 
 import argparse
+import datetime
 import os
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch as th
 import torch.distributed as dist
 
 from cm import dist_util, logger
+from cm.karras_diffusion import karras_sample
+from cm.random_util import get_generator
 from cm.script_util import (
     NUM_CLASSES,
-    model_and_diffusion_defaults,
-    create_model_and_diffusion,
     add_dict_to_argparser,
     args_to_dict,
+    create_model_and_diffusion,
+    model_and_diffusion_defaults,
 )
-from cm.random_util import get_generator
-from cm.karras_diffusion import karras_sample
 
 
 def main():
     args = create_argparser().parse_args()
 
     dist_util.setup_dist()
-    logger.configure()
+
+    log_dir = os.path.join(
+        args.log_dir, datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
+    )
+    logger.configure(log_dir)
 
     if "consistency" in args.training_mode:
         distillation = True
@@ -112,6 +118,8 @@ def main():
         else:
             np.savez(out_path, arr)
 
+        plot_image(out_path, logger.get_dir())
+
     dist.barrier()
     logger.log("sampling complete")
 
@@ -132,11 +140,63 @@ def create_argparser():
         model_path="",
         seed=42,
         ts="",
+        log_dir="",
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()
     add_dict_to_argparser(parser, defaults)
     return parser
+
+
+def plot_image(npz_file_path, target_dir):
+    # Load data from the .npz file
+    data = np.load(npz_file_path)
+    if len(data) == 1:
+        arr = next(iter(data.values()))
+        label_arr = None
+        print(arr.shape)
+    elif len(data) == 2:
+        arr, label_arr = data.values()
+        print(arr.shape, label_arr.shape)
+
+    # Number of images
+    N = arr.shape[0]
+
+    # Create a figure with subplots in a grid of N//5 x 5
+    fig, axs = plt.subplots(N // 5, 5, figsize=(15, 3 * (N // 5)))
+
+    # Ensure axs is 2D
+    axs = axs.reshape(-1)
+
+    # Plot each image and its label
+    for i, ax in enumerate(axs):
+        if i < N:
+            ax.imshow(arr[i])
+            ax.axis("off")
+            # Display the label at the center of each image
+            if label_arr is not None:
+                ax.text(
+                    0.5,
+                    0.5,
+                    str(label_arr[i]),
+                    color="white",
+                    fontsize=12,
+                    ha="center",
+                    va="center",
+                    transform=ax.transAxes,
+                )
+        else:
+            ax.axis("off")  # Turn off axis for empty subplots
+
+    # Adjust layout
+    plt.tight_layout()
+
+    # Save the figure
+    name = npz_file_path.split(os.sep)[-1]
+    name = name.split(".")[0]
+    png_file_path = os.path.join(target_dir, f"{name}.png")
+    print(png_file_path)
+    plt.savefig(png_file_path)
 
 
 if __name__ == "__main__":
